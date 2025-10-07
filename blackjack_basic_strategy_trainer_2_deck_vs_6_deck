@@ -114,6 +114,9 @@ function CountingModule() {
   const [timeLeft, setTimeLeft] = useState(0);
   const timerRef = useRef(null);
   const [errors, setErrors] = useState({ "+1": 0, 0: 0, "-1": 0 });
+  const [lastResult, setLastResult] = useState(null);
+  const [timedModeActive, setTimedModeActive] = useState(false);
+  const [timerSummary, setTimerSummary] = useState(null);
 
   useEffect(() => {
     const s = new Shoe(decks);
@@ -123,6 +126,7 @@ function CountingModule() {
     setCurrent(null);
     setHistory([]);
     setErrors({ "+1": 0, 0: 0, "-1": 0 });
+    setLastResult(null);
   }, [decks]);
 
   useEffect(() => {
@@ -135,6 +139,21 @@ function CountingModule() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+
+  useEffect(() => () => {
+    clearInterval(timerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (timedModeActive && timeLeft === 0) {
+      setTimerSummary({
+        attempts,
+        accuracy: attempts ? Math.round((100 * corrects) / attempts) : 0,
+        corrects,
+      });
+      setTimedModeActive(false);
+    }
+  }, [timedModeActive, timeLeft, attempts, corrects]);
 
   function nextCard() {
     const c = shoe.draw();
@@ -152,13 +171,16 @@ function CountingModule() {
   function submit(val) {
     if (!current) return;
 
-    const correctVal = HILO_MAP[current].toString();
+    const delta = HILO_MAP[current];
+    const correctVal = delta.toString();
     setAttempts((a) => a + 1);
 
     const isCorrect =
       val === correctVal ||
       (correctVal === "1" && val === "+1") ||
       (correctVal.startsWith("-") && val === "-1");
+
+    const correctDisplay = delta > 0 ? "+1" : delta < 0 ? "-1" : "0";
 
     if (isCorrect) {
       setCorrects((c) => c + 1);
@@ -168,7 +190,13 @@ function CountingModule() {
       setErrors((e) => ({ ...e, [val]: e[val] + 1 }));
     }
 
-    const delta = HILO_MAP[current];
+    setLastResult({
+      guess: val,
+      correct: correctDisplay,
+      isCorrect,
+      card: current,
+    });
+
     const newRunning = running + delta;
     const decksRemRounded = Math.max(1, Math.round(shoe.remainingDecks()));
     const newTrue = Math.trunc(newRunning / decksRemRounded);
@@ -180,7 +208,7 @@ function CountingModule() {
         {
           card: current,
           your: val,
-          correct: delta > 0 ? "+1" : delta < 0 ? "-1" : "0",
+          correct: correctDisplay,
           rc: newRunning,
           tc: newTrue,
         },
@@ -202,11 +230,14 @@ function CountingModule() {
 
   function startTimed(seconds = 60) {
     setTimeLeft(seconds);
+    setTimerSummary(null);
+    setTimedModeActive(true);
     clearInterval(timerRef.current);
     timerRef.current = setInterval(() =>
       setTimeLeft((t) => {
         if (t <= 1) {
           clearInterval(timerRef.current);
+          timerRef.current = null;
           return 0;
         }
         return t - 1;
@@ -235,13 +266,32 @@ function CountingModule() {
             <span className="text-sm text-gray-600">Press <kbd>+</kbd> for +1, <kbd>0</kbd> for 0, <kbd>-</kbd> for -1. Space = next card (optional).</span>
           </div>
           <div className="grid grid-cols-3 gap-3 mb-3">
-            {["+1","0","-1"].map(v=> (
-              <button key={v} onClick={()=>submit(v)} className="rounded-2xl border px-4 py-3 text-sm font-semibold hover:shadow">{v}</button>
-            ))}
+            {["+1","0","-1"].map(v=> {
+              const isSelected = lastResult?.guess === v;
+              const isCorrect = lastResult?.isCorrect && isSelected;
+              const isMissedCorrect = !lastResult?.isCorrect && lastResult?.correct === v;
+              const buttonClasses = [
+                "rounded-2xl border px-4 py-3 text-sm font-semibold transition focus:outline-none",
+                "hover:shadow",
+                isCorrect ? "border-green-400 bg-green-50" : "",
+                isSelected && !isCorrect ? "border-red-300 bg-red-50" : "",
+                isMissedCorrect ? "border-green-400 bg-green-50" : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
+              return (
+                <button key={v} onClick={()=>submit(v)} className={buttonClasses}>{v}</button>
+              );
+            })}
           </div>
+          {lastResult && (
+            <div className={`mb-3 rounded-xl border px-3 py-2 text-sm ${lastResult.isCorrect ? "bg-green-50 border-green-200 text-green-900" : "bg-red-50 border-red-200 text-red-900"}`}>
+              {lastResult.isCorrect ? "Great job!" : "Oops — that's not the Hi-Lo value."} The correct count adjustment for <strong>{lastResult.card}</strong> is <strong>{lastResult.correct}</strong>.
+            </div>
+          )}
           <div className="flex gap-2">
             <button className="rounded-xl border px-3 py-2 text-sm" onClick={nextCard}>Deal / Next [Space]</button>
-            <button className="rounded-xl border px-3 py-2 text-sm" onClick={()=>{const s=new Shoe(decks); setShoe(s); setRunning(0); setTrueCount(0); setAttempts(0); setCorrects(0); setStreak(0); setHistory([]); setErrors({"+1":0,"0":0,"-1":0}); setCurrent(null);}}>Reset Shoe</button>
+            <button className="rounded-xl border px-3 py-2 text-sm" onClick={()=>{const s=new Shoe(decks); setShoe(s); setRunning(0); setTrueCount(0); setAttempts(0); setCorrects(0); setStreak(0); setHistory([]); setErrors({"+1":0,"0":0,"-1":0}); setCurrent(null); setLastResult(null);}}>Reset Shoe</button>
             <button className="rounded-xl border px-3 py-2 text-sm" onClick={()=>startTimed(60)}>Timed 60s</button>
             {timeLeft>0 && <span className="text-sm text-gray-600">Time left: {timeLeft}s</span>}
           </div>
@@ -256,6 +306,13 @@ function CountingModule() {
             <div className="p-2 bg-gray-50 rounded-xl">Streak<div className="text-xl font-bold">{streak}</div></div>
             <div className="p-2 bg-gray-50 rounded-xl">Attempts<div className="text-xl font-bold">{attempts}</div></div>
           </div>
+          {timerSummary && (
+            <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+              <div className="font-semibold">Timed drill complete</div>
+              <div>You reviewed <strong>{timerSummary.attempts}</strong> cards with <strong>{timerSummary.corrects}</strong> correct answers ({timerSummary.accuracy}% accuracy).</div>
+              <div className="mt-1 text-xs text-blue-800">Tip: aim for 90%+ before increasing deck count or reducing the timer.</div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -289,6 +346,15 @@ function CountingModule() {
           <div className="text-xs text-gray-600 mt-2">(Advanced upgrade later: per‑rank matrix / confusion chart)</div>
         </div>
       </div>
+
+      <details className="rounded-2xl border bg-white p-4 text-sm text-gray-700 shadow">
+        <summary className="cursor-pointer text-sm font-semibold text-gray-900">Need a refresher on counting?</summary>
+        <div className="mt-3 space-y-2 text-sm">
+          <p>Hi-Lo assigns +1 to low cards (2–6), 0 to middle cards (7–9), and −1 to tens and aces. Keep a running total as each card appears.</p>
+          <p>Divide the running count by remaining decks to estimate the true count. Positive true counts mean the shoe is rich in tens and aces — raise your bets.</p>
+          <p className="text-xs text-gray-500">Keyboard shortcuts: <kbd>+</kbd> = +1, <kbd>0</kbd> = 0, <kbd>-</kbd> = −1, <kbd>Space</kbd> = deal next card.</p>
+        </div>
+      </details>
 
       <footer className="text-xs text-gray-500">Counting system: Hi‑Lo (+1 = 2–6, 0 = 7–9, −1 = 10–A). True count uses remaining decks (rounded) from the shoe.</footer>
     </div>
@@ -391,6 +457,7 @@ function StrategyModule() {
   const [streak, setStreak] = useState(0);
   const [feedback, setFeedback] = useState(null);
   const [history, setHistory] = useState([]);
+  const autoAdvanceRef = useRef(null);
 
   function generateScenario() {
     let p1 = randomCard(); let p2 = randomCard(); let up = randomCard();
@@ -410,6 +477,12 @@ function StrategyModule() {
     setAttempts(a=>a+1); setScore(s=> isCorrect? s+1 : s); setStreak(st=> isCorrect? st+1 : 0);
     setFeedback({ chosen: act, isCorrect });
     setHistory(h=>[{ ts:Date.now(), deck:deckMode, player:[...scenario.player], up:scenario.up, evald, chosen:act, correct }, ...h].slice(0,200));
+    clearTimeout(autoAdvanceRef.current);
+    if (isCorrect) {
+      autoAdvanceRef.current = setTimeout(() => {
+        next();
+      }, 1200);
+    }
   }
   const accuracy = attempts ? Math.round((100*score)/attempts) : 0;
 
@@ -417,6 +490,10 @@ function StrategyModule() {
     const onKey=(e)=>{ const k=e.key.toLowerCase(); if(k==="h") choose("H"); if(k==="s") choose("S"); if(k==="d") choose("D"); if(k==="p") choose("P"); if(k===" ") next(); };
     window.addEventListener("keydown", onKey); return ()=>window.removeEventListener("keydown", onKey);
   },[scenario, deckMode]);
+
+  useEffect(() => () => {
+    clearTimeout(autoAdvanceRef.current);
+  }, []);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -482,6 +559,14 @@ function StrategyModule() {
           {history.length === 0 && (<div className="text-sm text-gray-600">No attempts yet. Pick an action to begin.</div>)}
         </div>
       </div>
+      <details className="md:col-span-3 rounded-2xl border bg-white p-4 text-sm text-gray-700 shadow">
+        <summary className="cursor-pointer text-sm font-semibold text-gray-900">Strategy quick tips & shortcuts</summary>
+        <div className="mt-3 space-y-2">
+          <p>Remember the decision order: check for splits first, then soft totals, then hard totals. If doubling isn&apos;t allowed, fall back to a hit.</p>
+          <p>Keyboard shortcuts: <kbd>H</kbd> = Hit, <kbd>S</kbd> = Stand, <kbd>D</kbd> = Double, <kbd>P</kbd> = Split, <kbd>Space</kbd> = deal a new hand.</p>
+          <p className="text-xs text-gray-500">Tip: leave the trainer in 6-deck mode to practice shoe games, then switch to 2-deck for pitch games and spot the double-down tweaks.</p>
+        </div>
+      </details>
     </div>
   );
 }
