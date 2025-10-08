@@ -678,6 +678,19 @@ function StrategyModule() {
                 <Badge>Dealer {h.up}</Badge>
               </div>
               <div className="mt-1 text-sm">You: <strong>{ACTIONS.find(x=>x.key===h.chosen)?.label}</strong> • Correct: <strong>{ACTIONS.find(x=>x.key===h.correct)?.label}</strong></div>
+              {typeof h.correctWinChance === "number" && (
+                <div className="mt-1 text-xs text-gray-600">
+                  Correct move win chance: <strong>{h.correctWinChance}%</strong>
+                  {typeof h.chosenWinChance === "number" && (
+                    <>
+                      {" "}| Your move: <strong>{h.chosenWinChance}%</strong>
+                      {h.chosenWinChance !== h.correctWinChance && (
+                        <> ({h.chosenWinChance > h.correctWinChance ? "+" : ""}{Math.round((h.chosenWinChance - h.correctWinChance)*10)/10}% vs optimal)</>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           ))}
           {history.length === 0 && (<div className="text-sm text-gray-600">No attempts yet. Pick an action to begin.</div>)}
