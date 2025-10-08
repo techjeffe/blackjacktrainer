@@ -131,7 +131,7 @@ function CountingModule() {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === "+") submit("+1");
+      if (e.key === "+" || e.key === "=") submit("+1");
       if (e.key === "-") submit("-1");
       if (e.key === "0") submit("0");
       if (e.key === " ") nextCard();
@@ -263,7 +263,7 @@ function CountingModule() {
         <div className="md:col-span-2 p-4 bg-white rounded-2xl shadow">
           <div className="flex items-center gap-3 mb-3">
             <div className="text-4xl font-extrabold tracking-tight">{current ?? "?"}</div>
-            <span className="text-sm text-gray-600">Press <kbd>+</kbd> for +1, <kbd>0</kbd> for 0, <kbd>-</kbd> for -1. Space = next card (optional).</span>
+            <span className="text-sm text-gray-600">Press <kbd>+</kbd>/<kbd>=</kbd> for +1, <kbd>0</kbd> for 0, <kbd>-</kbd> for -1. Space = next card (optional).</span>
           </div>
           <div className="grid grid-cols-3 gap-3 mb-3">
             {["+1","0","-1"].map(v=> {
@@ -352,7 +352,7 @@ function CountingModule() {
         <div className="mt-3 space-y-2 text-sm">
           <p>Hi-Lo assigns +1 to low cards (2–6), 0 to middle cards (7–9), and −1 to tens and aces. Keep a running total as each card appears.</p>
           <p>Divide the running count by remaining decks to estimate the true count. Positive true counts mean the shoe is rich in tens and aces — raise your bets.</p>
-          <p className="text-xs text-gray-500">Keyboard shortcuts: <kbd>+</kbd> = +1, <kbd>0</kbd> = 0, <kbd>-</kbd> = −1, <kbd>Space</kbd> = deal next card.</p>
+          <p className="text-xs text-gray-500">Keyboard shortcuts: <kbd>+</kbd>/<kbd>=</kbd> = +1, <kbd>0</kbd> = 0, <kbd>-</kbd> = −1, <kbd>Space</kbd> = deal next card.</p>
         </div>
       </details>
 
