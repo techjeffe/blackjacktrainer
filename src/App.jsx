@@ -50,6 +50,126 @@ function randomCard() {
   return RANKS[Math.floor(Math.random() * RANKS.length)];
 }
 
+function simulateWinProbability({ player, up }, action, deckMode, trials = 1500) {
+  function drawCard() {
+    return randomCard();
+  }
+
+  function playDealer() {
+    const dealerCards = [up, drawCard()];
+    let dealerEval = evaluateHand(dealerCards);
+    if (dealerEval.total === 21 && dealerCards.length === 2) {
+      return { cards: dealerCards, eval: dealerEval, blackjack: true };
+    }
+    while (dealerEval.total < 17) {
+      dealerCards.push(drawCard());
+      dealerEval = evaluateHand(dealerCards);
+    }
+    return {
+      cards: dealerCards,
+      eval: dealerEval,
+      blackjack: false,
+    };
+  }
+
+  function resolveHand(cards, canDouble = true, canSplit = true, bet = 1) {
+    const evald = evaluateHand(cards);
+    if (evald.total > 21) {
+      return [{ cards, eval: evald, busted: true, bet }];
+    }
+    const decisionEval = { ...evald };
+    if (!canSplit) decisionEval.pairRank = null;
+    let nextAction = findAction(decisionEval, up, deckMode);
+    if (nextAction === "P" && !canSplit) {
+      decisionEval.pairRank = null;
+      nextAction = findAction(decisionEval, up, deckMode);
+    }
+    if (nextAction === "D" && !canDouble) {
+      nextAction = "H";
+    }
+
+    if (nextAction === "S") {
+      return [{ cards, eval: evald, busted: false, bet }];
+    }
+    if (nextAction === "H") {
+      const newCards = [...cards, drawCard()];
+      return resolveHand(newCards, false, false, bet);
+    }
+    if (nextAction === "D") {
+      const newCards = [...cards, drawCard()];
+      const newEval = evaluateHand(newCards);
+      return [{ cards: newCards, eval: newEval, busted: newEval.total > 21, bet: bet * 2 }];
+    }
+    if (nextAction === "P") {
+      const leftStart = [cards[0], drawCard()];
+      const rightStart = [cards[1], drawCard()];
+      const left = resolveHand(leftStart, true, false, bet);
+      const right = resolveHand(rightStart, true, false, bet);
+      return [...left, ...right];
+    }
+    return [{ cards, eval: evald, busted: evald.total > 21, bet }];
+  }
+
+  function simulateSingleRound() {
+    let playerHands = [];
+    if (action === "S") {
+      const evald = evaluateHand(player);
+      playerHands = [{ cards: [...player], eval: evald, busted: evald.total > 21, bet: 1 }];
+    } else if (action === "H") {
+      const first = [...player, drawCard()];
+      playerHands = resolveHand(first, false, false, 1);
+    } else if (action === "D") {
+      const newCards = [...player, drawCard()];
+      const evald = evaluateHand(newCards);
+      playerHands = [{ cards: newCards, eval: evald, busted: evald.total > 21, bet: 2 }];
+    } else if (action === "P") {
+      const first = [player[0], drawCard()];
+      const second = [player[1], drawCard()];
+      const left = resolveHand(first, true, false, 1);
+      const right = resolveHand(second, true, false, 1);
+      playerHands = [...left, ...right];
+    } else {
+      const evald = evaluateHand(player);
+      playerHands = [{ cards: [...player], eval: evald, busted: evald.total > 21, bet: 1 }];
+    }
+
+    const dealerState = playDealer();
+    let net = 0;
+
+    playerHands.forEach((hand) => {
+      if (hand.busted) {
+        net -= hand.bet;
+        return;
+      }
+      if (dealerState.blackjack) {
+        net -= hand.bet;
+        return;
+      }
+      if (dealerState.eval.total > 21) {
+        net += hand.bet;
+        return;
+      }
+      const playerTotal = evaluateHand(hand.cards).total;
+      const dealerTotal = dealerState.eval.total;
+      if (playerTotal > dealerTotal) {
+        net += hand.bet;
+      } else if (playerTotal < dealerTotal) {
+        net -= hand.bet;
+      }
+    });
+
+    return { net };
+  }
+
+  let wins = 0;
+  for (let i = 0; i < trials; i++) {
+    const { net } = simulateSingleRound();
+    if (net > 0) wins += 1;
+  }
+
+  return Math.round((wins / trials) * 1000) / 10;
+}
+
 // ==========================
 // Counting Module (Hi-Lo)
 // ==========================
@@ -475,8 +595,23 @@ function StrategyModule() {
   function choose(act){
     const isCorrect = act === correct;
     setAttempts(a=>a+1); setScore(s=> isCorrect? s+1 : s); setStreak(st=> isCorrect? st+1 : 0);
-    setFeedback({ chosen: act, isCorrect });
-    setHistory(h=>[{ ts:Date.now(), deck:deckMode, player:[...scenario.player], up:scenario.up, evald, chosen:act, correct }, ...h].slice(0,200));
+    const correctWinChance = simulateWinProbability(scenario, correct, deckMode);
+    const chosenWinChance = isCorrect ? correctWinChance : simulateWinProbability(scenario, act, deckMode);
+    setFeedback({ chosen: act, isCorrect, winChance: correctWinChance, correctWinChance, chosenWinChance });
+    setHistory(h=>[
+      {
+        ts:Date.now(),
+        deck:deckMode,
+        player:[...scenario.player],
+        up:scenario.up,
+        evald,
+        chosen:act,
+        correct,
+        correctWinChance,
+        chosenWinChance,
+      },
+      ...h,
+    ].slice(0,200));
     clearTimeout(autoAdvanceRef.current);
     if (isCorrect) {
       autoAdvanceRef.current = setTimeout(() => {
@@ -519,6 +654,25 @@ function StrategyModule() {
             <div className="font-semibold mb-1">{feedback.isCorrect ? "Correct" : "Not quite"}</div>
             <div className="text-sm text-gray-700">You chose <strong>{ACTIONS.find(x=>x.key===feedback.chosen)?.label}</strong>. The chart says <strong>{ACTIONS.find(x=>x.key===correct)?.label}</strong> for this spot.</div>
             <div className="mt-2 text-xs text-gray-600">Rationale: Pairs → soft totals → hard totals. Doubles default to Hit if not allowed.</div>
+            {typeof feedback.correctWinChance === "number" && (
+              <div className="mt-2 text-sm text-gray-700">
+                {feedback.isCorrect ? (
+                  <>Estimated win chance from here: <strong>{feedback.correctWinChance}%</strong> (simulated).</>
+                ) : (
+                  <>
+                    Follow the chart next time to keep about <strong>{feedback.correctWinChance}%</strong> win odds.
+                    {typeof feedback.chosenWinChance === "number" && (
+                      <>
+                        {" "}Your pick would play out around <strong>{feedback.chosenWinChance}%</strong>
+                        {feedback.chosenWinChance !== feedback.correctWinChance && (
+                          <> ({feedback.chosenWinChance > feedback.correctWinChance ? "+" : ""}{Math.round((feedback.chosenWinChance - feedback.correctWinChance)*10)/10}% vs optimal)</>
+                        )}.
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
             <button onClick={next} className="mt-3 text-sm underline">Next hand [Space]</button>
           </div>
         )}
@@ -554,6 +708,19 @@ function StrategyModule() {
                 <Badge>Dealer {h.up}</Badge>
               </div>
               <div className="mt-1 text-sm">You: <strong>{ACTIONS.find(x=>x.key===h.chosen)?.label}</strong> • Correct: <strong>{ACTIONS.find(x=>x.key===h.correct)?.label}</strong></div>
+              {typeof h.correctWinChance === "number" && (
+                <div className="mt-1 text-xs text-gray-600">
+                  Correct move win chance: <strong>{h.correctWinChance}%</strong>
+                  {typeof h.chosenWinChance === "number" && (
+                    <>
+                      {" "}| Your move: <strong>{h.chosenWinChance}%</strong>
+                      {h.chosenWinChance !== h.correctWinChance && (
+                        <> ({h.chosenWinChance > h.correctWinChance ? "+" : ""}{Math.round((h.chosenWinChance - h.correctWinChance)*10)/10}% vs optimal)</>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           ))}
           {history.length === 0 && (<div className="text-sm text-gray-600">No attempts yet. Pick an action to begin.</div>)}
