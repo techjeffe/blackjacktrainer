@@ -595,23 +595,9 @@ function StrategyModule() {
   function choose(act){
     const isCorrect = act === correct;
     setAttempts(a=>a+1); setScore(s=> isCorrect? s+1 : s); setStreak(st=> isCorrect? st+1 : 0);
-    const correctWinChance = simulateWinProbability(scenario, correct, deckMode);
-    const chosenWinChance = isCorrect ? correctWinChance : simulateWinProbability(scenario, act, deckMode);
-    setFeedback({ chosen: act, isCorrect, winChance: correctWinChance, correctWinChance, chosenWinChance });
-    setHistory(h=>[
-      {
-        ts:Date.now(),
-        deck:deckMode,
-        player:[...scenario.player],
-        up:scenario.up,
-        evald,
-        chosen:act,
-        correct,
-        correctWinChance,
-        chosenWinChance,
-      },
-      ...h,
-    ].slice(0,200));
+    const winChance = isCorrect ? simulateWinProbability(scenario, act, deckMode) : null;
+    setFeedback({ chosen: act, isCorrect, winChance });
+    setHistory(h=>[{ ts:Date.now(), deck:deckMode, player:[...scenario.player], up:scenario.up, evald, chosen:act, correct }, ...h].slice(0,200));
     clearTimeout(autoAdvanceRef.current);
     if (isCorrect) {
       autoAdvanceRef.current = setTimeout(() => {
@@ -654,24 +640,8 @@ function StrategyModule() {
             <div className="font-semibold mb-1">{feedback.isCorrect ? "Correct" : "Not quite"}</div>
             <div className="text-sm text-gray-700">You chose <strong>{ACTIONS.find(x=>x.key===feedback.chosen)?.label}</strong>. The chart says <strong>{ACTIONS.find(x=>x.key===correct)?.label}</strong> for this spot.</div>
             <div className="mt-2 text-xs text-gray-600">Rationale: Pairs → soft totals → hard totals. Doubles default to Hit if not allowed.</div>
-            {typeof feedback.correctWinChance === "number" && (
-              <div className="mt-2 text-sm text-gray-700">
-                {feedback.isCorrect ? (
-                  <>Estimated win chance from here: <strong>{feedback.correctWinChance}%</strong> (simulated).</>
-                ) : (
-                  <>
-                    Follow the chart next time to keep about <strong>{feedback.correctWinChance}%</strong> win odds.
-                    {typeof feedback.chosenWinChance === "number" && (
-                      <>
-                        {" "}Your pick would play out around <strong>{feedback.chosenWinChance}%</strong>
-                        {feedback.chosenWinChance !== feedback.correctWinChance && (
-                          <> ({feedback.chosenWinChance > feedback.correctWinChance ? "+" : ""}{Math.round((feedback.chosenWinChance - feedback.correctWinChance)*10)/10}% vs optimal)</>
-                        )}.
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
+            {feedback.isCorrect && typeof feedback.winChance === "number" && (
+              <div className="mt-2 text-sm text-gray-700">Estimated win chance from here: <strong>{feedback.winChance}%</strong> (simulated).</div>
             )}
             <button onClick={next} className="mt-3 text-sm underline">Next hand [Space]</button>
           </div>
