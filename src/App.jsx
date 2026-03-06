@@ -368,7 +368,10 @@ function CountingModule() {
   const acc = attempts ? Math.round((100 * corrects) / attempts) : 0;
 
   return (
-    <div className="space-y-5">
+    <div
+      className="space-y-5 rounded-[30px] border border-emerald-950/30 bg-emerald-900/95 p-4 shadow-2xl shadow-emerald-950/30"
+      style={{ backgroundImage: "radial-gradient(circle at 20% 15%, rgba(255,255,255,0.07), transparent 30%), radial-gradient(circle at 80% 80%, rgba(255,255,255,0.06), transparent 32%)" }}
+    >
       <div className="flex flex-wrap items-end justify-between gap-3 rounded-3xl border border-emerald-200/80 bg-gradient-to-r from-emerald-50 via-cyan-50 to-sky-100 px-5 py-4 shadow-sm">
         <div>
           <h2 className="text-xl font-bold text-slate-900">Card Counting Trainer</h2>
@@ -386,11 +389,11 @@ function CountingModule() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="md:col-span-2 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-lg shadow-slate-900/5 backdrop-blur-sm">
           <div className="mb-4 flex items-center gap-4">
-            <div className="flex h-24 w-20 items-center justify-center rounded-2xl border-2 border-emerald-300 bg-white text-5xl font-black text-slate-900 shadow-md">
-              {current ?? "?"}
+            <div className="flex h-24 w-20 items-center justify-center rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-100 to-amber-50 shadow-inner">
+              <PlayingCard rank={current ?? "?"} seed={0} />
             </div>
             <span className="text-sm text-slate-600">Press <kbd className="rounded border border-slate-300 bg-white px-1">+</kbd>/<kbd className="rounded border border-slate-300 bg-white px-1">=</kbd> for +1, <kbd className="rounded border border-slate-300 bg-white px-1">0</kbd> for 0, <kbd className="rounded border border-slate-300 bg-white px-1">-</kbd> for -1. Space deals next card.</span>
           </div>
@@ -400,7 +403,7 @@ function CountingModule() {
               const isCorrect = lastResult?.isCorrect && isSelected;
               const isMissedCorrect = !lastResult?.isCorrect && lastResult?.correct === v;
               const buttonClasses = [
-                "rounded-2xl border px-4 py-3 text-base font-bold transition focus:outline-none focus:ring-2 focus:ring-emerald-200",
+                "rounded-full border px-4 py-3 text-base font-black transition focus:outline-none focus:ring-2 focus:ring-emerald-200",
                 "border-slate-300 bg-slate-50 hover:-translate-y-0.5 hover:shadow-md",
                 isCorrect ? "border-emerald-400 bg-emerald-100 text-emerald-900" : "",
                 isSelected && !isCorrect ? "border-rose-300 bg-rose-100 text-rose-900" : "",
@@ -452,7 +455,7 @@ function CountingModule() {
           <div className="space-y-2 max-h-56 overflow-auto">
             {history.map((h, i)=> (
               <div key={i} className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-2 text-sm">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 bg-white text-base font-bold">{h.card}</span>
+                <PlayingCard rank={h.card} seed={i} compact />
                 <span>Your: <strong>{h.your}</strong></span>
                 <span>Correct: <strong>{h.correct}</strong></span>
                 <span>RC: <strong>{h.rc}</strong></span>
@@ -594,6 +597,40 @@ function StatCard({ label, value, accent = "text-slate-900" }) {
   );
 }
 
+const SUITS = [
+  { symbol: "♠", red: false, name: "Spades" },
+  { symbol: "♥", red: true, name: "Hearts" },
+  { symbol: "♦", red: true, name: "Diamonds" },
+  { symbol: "♣", red: false, name: "Clubs" },
+];
+
+function getSuit(rank, seed = 0) {
+  if (!rank || rank === "?") return SUITS[0];
+  const n = rank === "10" ? 10 : rank.charCodeAt(0);
+  return SUITS[(n + seed) % SUITS.length];
+}
+
+function PlayingCard({ rank, seed = 0, compact = false }) {
+  const suit = getSuit(rank, seed);
+  const tone = suit.red ? "text-rose-600" : "text-slate-800";
+  const size = compact ? "h-10 w-8 rounded-lg text-base" : "h-16 w-12 rounded-xl text-2xl";
+  const corner = compact ? "text-[9px]" : "text-[10px]";
+  if (!rank || rank === "?") {
+    return (
+      <span className={`inline-flex items-center justify-center border-2 border-emerald-300 bg-white font-black text-slate-700 shadow-sm ${size}`}>
+        ?
+      </span>
+    );
+  }
+  return (
+    <span className={`relative inline-flex items-center justify-center border-2 border-emerald-300 bg-white font-black shadow-sm ${size} ${tone}`}>
+      <span className={`absolute left-1 top-1 font-bold ${corner}`}>{suit.symbol}</span>
+      <span>{rank}</span>
+      <span className={`absolute bottom-1 right-1 font-bold ${corner}`}>{suit.symbol}</span>
+    </span>
+  );
+}
+
 function StrategyModule() {
   const [deckMode, setDeckMode] = useState("6D");
   const [scenario, setScenario] = useState(()=>generateScenario());
@@ -642,15 +679,19 @@ function StrategyModule() {
   }, []);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <div
+      className="mb-6 grid grid-cols-1 gap-4 rounded-[30px] border border-emerald-950/30 bg-emerald-900/95 p-4 shadow-2xl shadow-emerald-950/30 md:grid-cols-3"
+      style={{ backgroundImage: "radial-gradient(circle at 15% 20%, rgba(255,255,255,0.07), transparent 35%), radial-gradient(circle at 90% 75%, rgba(255,255,255,0.06), transparent 30%)" }}
+    >
       <div className="md:col-span-2 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-lg shadow-slate-900/5 backdrop-blur-sm">
         <h2 className="mb-2 text-lg font-semibold text-slate-900">Current Hand</h2>
         <div className="mb-3 flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="inline-flex h-16 w-12 items-center justify-center rounded-xl border-2 border-emerald-300 bg-white text-2xl font-black text-slate-900 shadow-sm">{scenario.player[0]}</span>
-            <span className="inline-flex h-16 w-12 items-center justify-center rounded-xl border-2 border-emerald-300 bg-white text-2xl font-black text-slate-900 shadow-sm">{scenario.player[1]}</span>
+            <PlayingCard rank={scenario.player[0]} seed={0} />
+            <PlayingCard rank={scenario.player[1]} seed={1} />
           </div>
-          <Badge>Dealer: {scenario.up}</Badge>
+          <Badge>Dealer</Badge>
+          <PlayingCard rank={scenario.up} seed={2} compact />
         </div>
         <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-slate-600">
           <Badge>{evald.soft ? `Soft ${evald.total}` : `Hard ${evald.total}`}</Badge>
@@ -663,7 +704,7 @@ function StrategyModule() {
             <button
               key={a.key}
               onClick={()=>choose(a.key)}
-              className="rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-200"
+              className="rounded-full border border-slate-300 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-200"
             >
               {a.label} <span className="text-xs text-slate-500">[{a.key}]</span>
             </button>
@@ -706,6 +747,8 @@ function StrategyModule() {
           {history.map((h,i)=> (
             <div key={i} className="rounded-xl border border-slate-200 bg-slate-50/70 p-2">
               <div className="flex flex-wrap items-center gap-2 text-sm">
+                <PlayingCard rank={h.player?.[0]} seed={i} compact />
+                <PlayingCard rank={h.player?.[1]} seed={i + 1} compact />
                 <Badge>{h.deck}</Badge>
                 <Badge>{h.evald.soft ? `Soft ${h.evald.total}` : `Hard ${h.evald.total}`}</Badge>
                 {h.evald.pairRank && <Badge>Pair {h.evald.pairRank}</Badge>}
@@ -747,13 +790,13 @@ export default function App(){
   const [mode, setMode] = useState("strategy");
   return (
     <div
-      className="min-h-screen bg-gradient-to-br from-slate-100 via-cyan-50 to-emerald-100 px-4 py-6 text-slate-900 sm:px-6"
+      className="min-h-screen bg-gradient-to-br from-[#052e2b] via-[#064e3b] to-[#02201c] px-4 py-6 text-slate-900 sm:px-6"
       style={{ fontFamily: '"Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif' }}
     >
-      <div className="pointer-events-none absolute left-0 top-0 -z-10 h-80 w-80 rounded-full bg-cyan-300/30 blur-3xl" />
+      <div className="pointer-events-none absolute left-0 top-0 -z-10 h-80 w-80 rounded-full bg-amber-200/20 blur-3xl" />
       <div className="pointer-events-none absolute bottom-0 right-0 -z-10 h-96 w-96 rounded-full bg-emerald-300/25 blur-3xl" />
       <div className="relative z-10 mx-auto max-w-5xl">
-        <header className="mb-6 rounded-3xl border border-slate-200/80 bg-white/75 px-5 py-4 shadow-lg shadow-slate-900/5 backdrop-blur-sm">
+        <header className="mb-6 rounded-3xl border border-amber-300/60 bg-amber-50/90 px-5 py-4 shadow-lg shadow-black/20 backdrop-blur-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-3xl font-black tracking-tight text-slate-900">Blackjack Trainer</h1>
@@ -769,7 +812,7 @@ export default function App(){
           </div>
         </header>
         {mode === "strategy" ? <StrategyModule/> : <CountingModule/>}
-        <footer className="mt-6 text-center text-xs text-slate-600">Strategy: S17/DAS/no surrender. Counting: Hi-Lo with true count from remaining decks.</footer>
+        <footer className="mt-6 text-center text-xs text-emerald-100/90">Strategy: S17/DAS/no surrender. Counting: Hi-Lo with true count from remaining decks.</footer>
       </div>
     </div>
   );
